@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "ml-flow"
+version = "0.1.0"
+description = ""
+authors = ["Emmanuel Martínez <emartinez@seebak.com.mx>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+"aws-cdk.aws-ecs-patterns" = "^1.109.0"
+"aws-cdk.aws-secretsmanager" = "^1.109.0"
+"aws-cdk.aws-iam" = "^1.109.0"
+"aws-cdk.aws-rds" = "^1.109.0"
+"aws-cdk.aws-ecs" = "^1.109.0"
+"aws-cdk.aws-s3" = "^1.109.0"
+"aws-cdk.aws-ec2" = "^1.109.0"
+"aws-cdk.core" = "^1.109.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
