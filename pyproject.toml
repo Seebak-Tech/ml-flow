@@ -6,14 +6,8 @@ authors = ["Emmanuel Martínez <emartinez@seebak.com.mx>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-"aws-cdk.aws-ecs-patterns" = "^1.109.0"
-"aws-cdk.aws-secretsmanager" = "^1.109.0"
-"aws-cdk.aws-iam" = "^1.109.0"
-"aws-cdk.aws-rds" = "^1.109.0"
-"aws-cdk.aws-ecs" = "^1.109.0"
-"aws-cdk.aws-s3" = "^1.109.0"
-"aws-cdk.aws-ec2" = "^1.109.0"
-"aws-cdk.core" = "^1.109.0"
+requests = "^2.25.1"
+aws-cdk-lib = "^2.0.0rc1"
 
 [tool.poetry.dev-dependencies]
 
