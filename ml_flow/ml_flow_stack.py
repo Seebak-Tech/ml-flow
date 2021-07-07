@@ -79,12 +79,21 @@ class MlFlowStack(Stack):
             cidr_mask=28
         )
 
+        nat_gateway_instance = ec2.NatProvider.instance(
+            instance_type=ec2.InstanceType("t2.micro"),
+            machine_image=ec2.GenericLinuxImage(
+                ami_map={
+                    'us-west-2': 'ami-0a4bc8a5c1ed3b5a3'
+                }
+            )
+        )
+
         vpc = ec2.Vpc(
             scope=self,
             id='VPC',
             cidr='10.0.0.0/24',
             max_azs=2,
-            nat_gateway_provider=ec2.NatProvider.gateway(),
+            nat_gateway_provider=nat_gateway_instance,
             nat_gateways=1,
             subnet_configuration=[public_subnet,
                                   private_subnet,
