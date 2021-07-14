@@ -1,14 +1,15 @@
-from aws_cdk import Stack
+import aws_cdk as cdk
 from constructs import Construct
 from aws_cdk import (
     aws_ec2 as ec2,
     aws_s3 as s3,
-    aws_ecs as ecs,
+    #  aws_ecs as ecs,
     aws_rds as rds,
     aws_iam as iam,
     aws_secretsmanager as sm,
-    aws_ecs_patterns as ecs_patterns,
-    CfnParameter
+    #  aws_ecs_patterns as ecs_patterns,
+    CfnParameter,
+    Stack
 )
 
 
@@ -22,19 +23,20 @@ class MlFlowStack(Stack):
         # ==============================
         # ======= CFN PARAMETERS =======
         # ==============================
-        #  project_name_param = CfnParameter(
-        #  scope=self,
-        #  id='ML-FLow',
-        #  type='String'
-        #  )
+        project_name_param = CfnParameter(
+            scope=self,
+            id='ProjectName',
+            type='String',
+            default='mlflow'
+        )
 
-        #  db_name = 'mlflowdb'
-        #  port = 3306
-        #  username = 'master'
-        #  bucket_name = (
-        #  f'{project_name_param.value_as_string}-artifacts- \
-        #  {core.Aws.ACCOUNT_ID}'
-        #  )
+        db_name = 'mlflowdb'
+        port = 3306
+        username = 'master'
+        bucket_name = (
+            f'{project_name_param.value_as_string}-artifacts-'
+            f'{cdk.Aws.ACCOUNT_ID}'
+        )
         #  container_repo_name = 'mlflow-containers'
         #  cluster_name = 'mlflow'
         #  service_name = 'mlflow'
@@ -56,6 +58,19 @@ class MlFlowStack(Stack):
         role.add_managed_policy(
             iam.ManagedPolicy
                .from_aws_managed_policy_name('AmazonECS_FullAccess')
+        )
+
+        # ==================================================
+        # ================== SECRET ========================
+        # ==================================================
+        db_password_secret = sm.Secret(
+            scope=self,
+            id='DBSECRET',
+            secret_name='dbPassword',
+            generate_secret_string=sm.SecretStringGenerator(
+                password_length=20,
+                exclude_punctuation=True
+            )
         )
 
         # ==================================================
@@ -103,4 +118,60 @@ class MlFlowStack(Stack):
         vpc.add_gateway_endpoint(
             'S3Endpoint',
             service=ec2.GatewayVpcEndpointAwsService.S3
+        )
+
+        # ==================================================
+        # ================= S3 BUCKET ======================
+        # ==================================================
+        artifact_bucket = s3.Bucket(
+            scope=self,
+            id='ARTIFACTBUCKET',
+            bucket_name=bucket_name,
+            public_read_access=False,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            removal_policy=cdk.RemovalPolicy.DESTROY
+        )
+
+        # # ==================================================
+        # # ================== DATABASE  =====================
+        # # ==================================================
+        # Creates a security group for AWS RDS
+        sg_rds = ec2.SecurityGroup(
+            scope=self,
+            id='SGRDS',
+            vpc=vpc,
+            security_group_name='sg_rds'
+        )
+        # Adds an ingress rule which allows resources in the VPC's
+        # CIDR to access the database.
+        sg_rds.add_ingress_rule(
+            peer=ec2.Peer.ipv4('10.0.0.0/24'),
+            connection=ec2.Port.tcp(port)
+        )
+
+        database = rds.DatabaseInstance(
+            scope=self,
+            id='MYSQL',
+            database_name=db_name,
+            port=port,
+            credentials=rds.Credentials.from_password(
+                username=username,
+                password=db_password_secret.secret_value
+            ),
+            allocated_storage=20,
+            engine=rds.DatabaseInstanceEngine.mysql(
+                version=rds.MysqlEngineVersion.VER_8_0_23
+            ),
+            instance_type=ec2.InstanceType.of(
+                ec2.InstanceClass.BURSTABLE2,
+                ec2.InstanceSize.MICRO
+            ),
+            vpc=vpc,
+            security_groups=[sg_rds],
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.ISOLATED
+            ),
+            # multi_az=True,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+            deletion_protection=False
         )
