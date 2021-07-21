@@ -3,11 +3,11 @@ from constructs import Construct
 from aws_cdk import (
     aws_ec2 as ec2,
     aws_s3 as s3,
-    #  aws_ecs as ecs,
+    aws_ecs as ecs,
     aws_rds as rds,
     aws_iam as iam,
     aws_secretsmanager as sm,
-    #  aws_ecs_patterns as ecs_patterns,
+    aws_ecs_patterns as ecs_patterns,
     CfnParameter,
     Stack
 )
@@ -37,9 +37,10 @@ class MlFlowStack(Stack):
             f'{project_name_param.value_as_string}-artifacts-'
             f'{cdk.Aws.ACCOUNT_ID}'
         )
-        #  container_repo_name = 'mlflow-containers'
-        #  cluster_name = 'mlflow'
-        #  service_name = 'mlflow'
+
+        container_repo_name = 'mlflow-containers'
+        cluster_name = 'mlflow_clus'
+        service_name = 'mlflow_serv'
 
         # ==================================================
         # ================= IAM ROLE =======================
@@ -175,3 +176,68 @@ class MlFlowStack(Stack):
             removal_policy=cdk.RemovalPolicy.DESTROY,
             deletion_protection=False
         )
+
+        # ==================================================
+        # =============== ECS SERVICE ==================
+        # ==================================================
+        cluster = ecs.Cluster(
+            scope=self,
+            id='CLUSTER',
+            capacity=ecs.AddCapacityOptions(
+                instance_type=ec2.InstanceType("t2.micro"),
+                desired_capacity=1,
+                max_capacity=1
+            ),
+            cluster_name=cluster_name,
+            vpc=vpc
+        )
+
+        task_definition = ecs.Ec2TaskDefinition(
+            scope=self,
+            id='MLflow',
+            task_role=role,
+        )
+
+        container = task_definition.add_container(
+            id='Container',
+            image=ecs.ContainerImage.from_asset(
+                directory='container'
+            ),
+            memory_limit_mib=800,
+            environment={
+                'BUCKET': f's3://{artifact_bucket.bucket_name}',
+                'HOST': database.db_instance_endpoint_address,
+                'PORT': str(port),
+                'DATABASE': db_name,
+                'USERNAME': username
+            },
+            secrets={
+                'PASSWORD': ecs.Secret.from_secrets_manager(db_password_secret)
+            }
+        )
+
+        port_mapping = ecs.PortMapping(
+            container_port=5000,
+            host_port=5000,
+            protocol=ecs.Protocol.TCP
+        )
+
+        container.add_port_mappings(port_mapping)
+
+        ml_flow_service = ecs_patterns.NetworkLoadBalancedEc2Service(
+            scope=self,
+            id='MLFLOW',
+            service_name=service_name,
+            cluster=cluster,
+            task_definition=task_definition
+        )
+
+        # Setup security group
+        ml_flow_service.service \
+                       .connections \
+                       .security_groups[0] \
+                       .add_ingress_rule(
+                           peer=ec2.Peer.ipv4(vpc.vpc_cidr_block),
+                           connection=ec2.Port.tcp(5000),
+                           description='Allow inbound from VPC for mlflow'
+                        )
