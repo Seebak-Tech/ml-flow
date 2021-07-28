@@ -224,7 +224,7 @@ class MlFlowStack(Stack):
 
         container.add_port_mappings(port_mapping)
 
-        ml_flow_service = ecs_patterns.NetworkLoadBalancedEc2Service(
+        ml_flow_service = ecs_patterns.ApplicationLoadBalancedEc2Service(
             scope=self,
             id='MLFLOW',
             service_name=service_name,
@@ -241,3 +241,12 @@ class MlFlowStack(Stack):
                            connection=ec2.Port.tcp(5000),
                            description='Allow inbound from VPC for mlflow'
                         )
+
+        # ==================================================
+        # =================== OUTPUTS ======================
+        # ==================================================
+        cdk.CfnOutput(
+            scope=self,
+            id='LoadBalancerDNS',
+            value=ml_flow_service.load_balancer.load_balancer_dns_name
+        )
