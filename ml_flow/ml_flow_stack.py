@@ -6,6 +6,8 @@ from aws_cdk import (
     aws_ecs as ecs,
     aws_rds as rds,
     aws_iam as iam,
+    aws_route53 as route53,
+    aws_route53_targets as targets,
     aws_secretsmanager as sm,
     aws_ecs_patterns as ecs_patterns,
     CfnParameter,
@@ -85,13 +87,13 @@ class MlFlowStack(Stack):
 
         private_subnet = ec2.SubnetConfiguration(
             name='Private',
-            subnet_type=ec2.SubnetType.PRIVATE,
+            subnet_type=ec2.SubnetType.PRIVATE_WITH_NAT,
             cidr_mask=28
         )
 
         isolated_subnet = ec2.SubnetConfiguration(
             name='DB',
-            subnet_type=ec2.SubnetType.ISOLATED,
+            subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
             cidr_mask=28
         )
 
@@ -170,7 +172,7 @@ class MlFlowStack(Stack):
             vpc=vpc,
             security_groups=[sg_rds],
             vpc_subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.ISOLATED
+                subnet_type=ec2.SubnetType.PRIVATE_ISOLATED
             ),
             # multi_az=True,
             removal_policy=cdk.RemovalPolicy.DESTROY,
@@ -232,6 +234,23 @@ class MlFlowStack(Stack):
             task_definition=task_definition
         )
 
+        route53_hosted_zone = route53.HostedZone.from_lookup(
+            scope=self,
+            id="HostedZone",
+            domain_name="seebak.com.mx"
+        )
+        record = route53.ARecord(
+            scope=self,
+            id="AliasRecord",
+            zone=route53_hosted_zone,
+            target=route53.RecordTarget.from_alias(
+                targets.LoadBalancerTarget(
+                    ml_flow_service.load_balancer
+                )
+            ),
+            record_name="mlflow.srvc"
+        )
+
         # Setup security group
         ml_flow_service.service \
                        .connections \
@@ -247,6 +266,6 @@ class MlFlowStack(Stack):
         # ==================================================
         cdk.CfnOutput(
             scope=self,
-            id='LoadBalancerDNS',
-            value=ml_flow_service.load_balancer.load_balancer_dns_name
+            id='URL',
+            value=record.domain_name
         )
